@@ -8,7 +8,6 @@
 
 #include <cstddef>
 #include <vector>
-#include <set>
 #include <functional>
 #include <string>
 #include <array>
@@ -214,8 +213,7 @@ const std::size_t Vertex<A1, A2, A3, A4, A5>::attributeOffsets[5] = {
 
 } // namespace detail
 
-void bindAttributeLocation(ProgramID, AttributeLocation, const char * name);
-std::set<std::string> getActiveAttributes(ProgramID);
+AttributeLocation bindAttributeLocation(ProgramID, AttributeLocation, const char * name);
 
 template <class... As>
 class Attributes {
@@ -231,20 +229,11 @@ public:
 
     using Vertex = detail::Vertex<typename As::Type...>;
 
+    template <class A>
+    static constexpr std::size_t Index = TypeIndex<A, As...>::value;
+
     static Locations bindLocations(const ProgramID& id) {
-        std::set<std::string> activeAttributes = getActiveAttributes(id);
-
-        AttributeLocation location = 0;
-        auto maybeBindLocation = [&](const char* name) -> optional<AttributeLocation> {
-            if (activeAttributes.count(name)) {
-                bindAttributeLocation(id, location, name);
-                return location++;
-            } else {
-                return {};
-            }
-        };
-
-        return Locations { maybeBindLocation(As::name())... };
+        return Locations { bindAttributeLocation(id, Index<As>, As::name())... };
     }
 
     template <class Program>
@@ -268,7 +257,7 @@ public:
 
     template <class DrawMode>
     static Bindings bindings(const VertexBuffer<Vertex, DrawMode>& buffer) {
-        return Bindings { As::Type::binding(buffer, TypeIndex<As, As...>::value)... };
+        return Bindings { As::Type::binding(buffer, Index<As>)... };
     }
 
     static Bindings offsetBindings(const Bindings& bindings, std::size_t vertexOffset) {
